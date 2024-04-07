@@ -32,6 +32,15 @@ func (u *urls) setCodeUrl(url string, code int) {
 	u.siteUrls[url] = code
 }
 
+func (u *urls) isExist(url string) bool {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	if _, ok := u.siteUrls[url]; ok {
+		return true
+	}
+	return false
+}
+
 var site string
 
 var re = regexp.MustCompile(`(?U)<a.*href=(['"])(https://|/)(.*)(/'|/"|'|").*>`)
@@ -63,7 +72,8 @@ func main() {
 		fmt.Printf("Start parse: %v\n", page.Value)
 		pageTime := time.Now()
 
-		go parse(page)
+		parse(page)
+		queue.Remove(page)
 
 		fmt.Printf("End parse page - Time: %f\n\n", time.Since(pageTime).Seconds())
 	}
@@ -75,8 +85,6 @@ func main() {
 }
 
 func parse(keyList *list.Element) {
-	defer queue.Remove(keyList)
-
 	key := fmt.Sprint(keyList.Value)
 	var urlPre string
 	if strings.Contains(key, site) {
@@ -100,7 +108,7 @@ func parse(keyList *list.Element) {
 	body, _ := io.ReadAll(res.Body)
 	for _, match := range re.FindAllStringSubmatch(string(body), -1) {
 		if match[3] != "" {
-			if _, ok := MapUrls.siteUrls[match[3]]; !ok {
+			if !MapUrls.isExist(match[3]) {
 				MapUrls.addUrl(match[3])
 				queue.PushBack(match[3])
 			}
